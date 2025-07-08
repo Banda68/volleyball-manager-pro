@@ -1,0 +1,184 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Enums per la pallavolo
+enum UserRole {
+  ADMIN
+  COACH
+  ATHLETE
+  PARENT
+  REFEREE
+}
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
+enum VolleyballPosition {
+  SETTER          // Palleggiatore
+  OUTSIDE_HITTER  // Schiacciatore
+  MIDDLE_BLOCKER  // Centrale
+  OPPOSITE        // Opposto
+  LIBERO          // Libero
+}
+
+enum TeamCategory {
+  // Minivolley S3
+  S3_PRIMO_LIVELLO_MIXED
+  S3_SECONDO_LIVELLO_MIXED
+  S3_PRIMO_LIVELLO_MALE
+  S3_PRIMO_LIVELLO_FEMALE
+  S3_SECONDO_LIVELLO_MALE
+  S3_SECONDO_LIVELLO_FEMALE
+  
+  // Giovanili
+  UNDER_12_MALE
+  UNDER_12_FEMALE
+  UNDER_14_MALE
+  UNDER_14_FEMALE
+  UNDER_16_MALE
+  UNDER_16_FEMALE
+  UNDER_18_MALE
+  UNDER_18_FEMALE
+  
+  // Senior
+  SERIE_A1_FEMALE
+  SERIE_A2_FEMALE
+  SERIE_B1_FEMALE
+  SERIE_B2_FEMALE
+  PRIMA_DIVISIONE_FEMALE
+  SUPERLEGA_MALE
+  SERIE_A2_MALE
+  SERIE_B_MALE
+  PRIMA_DIVISIONE_MALE
+}
+
+// Società sportive
+model Organization {
+  id          String  @id @default(cuid())
+  name        String
+  fipavCode   String  @unique
+  city        String?
+  region      String?
+  email       String? @unique
+  phone       String?
+  isActive    Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relazioni
+  users       User[]
+  athletes    Athlete[]
+  teams       Team[]
+
+  @@map("organizations")
+}
+
+// Utenti del sistema
+model User {
+  id             String       @id @default(cuid())
+  organizationId String?
+  email          String       @unique
+  passwordHash   String
+  role           UserRole
+  firstName      String?
+  lastName       String?
+  phone          String?
+  isVerified     Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  // Relazioni
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  athlete        Athlete?
+  coachedTeams   Team[]
+
+  @@map("users")
+}
+
+// Atleti (tutte le età)
+model Athlete {
+  id                        String              @id @default(cuid())
+  organizationId            String
+  userId                    String?             @unique
+  firstName                 String
+  lastName                  String
+  birthDate                 DateTime
+  gender                    Gender
+  fiscalCode                String?             @unique
+  height                    Int?
+  weight                    Float?
+  position                  VolleyballPosition?
+  jerseyNumber              Int?
+  
+  // Contatti famiglia (per minorenni)
+  parent1Name               String?
+  parent1Phone              String?
+  parent1Email              String?
+  parent2Name               String?
+  parent2Phone              String?
+  parent2Email              String?
+  
+  // Documenti sportivi
+  medicalCertificateExpiry  DateTime?
+  fipavCardNumber           String?
+  photoUrl                  String?
+  notes                     String?
+  isActive                  Boolean             @default(true)
+  createdAt                 DateTime            @default(now())
+  updatedAt                 DateTime            @updatedAt
+
+  // Relazioni
+  organization              Organization        @relation(fields: [organizationId], references: [id])
+  user                      User?               @relation(fields: [userId], references: [id])
+  teamRosters               TeamRoster[]
+
+  @@map("athletes")
+}
+
+// Squadre
+model Team {
+  id             String       @id @default(cuid())
+  organizationId String
+  name           String
+  category       TeamCategory
+  season         String       // "2024-2025"
+  coachId        String?
+  gymName        String?
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  // Relazioni
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  coach          User?        @relation(fields: [coachId], references: [id])
+  roster         TeamRoster[]
+
+  @@map("teams")
+}
+
+// Rosa squadra
+model TeamRoster {
+  id          String              @id @default(cuid())
+  teamId      String
+  athleteId   String
+  season      String
+  jerseyNumber Int?
+  position    VolleyballPosition?
+  joinedDate  DateTime            @default(now())
+  isActive    Boolean             @default(true)
+
+  // Relazioni
+  team        Team                @relation(fields: [teamId], references: [id])
+  athlete     Athlete             @relation(fields: [athleteId], references: [id])
+
+  @@unique([teamId, athleteId, season])
+  @@map("team_rosters")
+}
